@@ -1,10 +1,14 @@
 module Main where
 
 import qualified Data.ByteString.Char8 as BS
-import qualified Data.Set as Set
-import Data.List
-import Data.Maybe
 import Control.Monad
+import Data.Maybe
+import qualified Data.Graph as G
+-- import qualified Data.IntMap as IM
+import qualified Data.IntSet as IS
+-- import Data.List
+-- import qualified Data.Set as Set
+import qualified Data.Tree as T
 
 
 main :: IO ()
@@ -12,18 +16,17 @@ main = do
   [n, q] <- map (fst . fromJust . BS.readInt) . BS.words <$> BS.getLine
   rs <- map (map (fst . fromJust . BS.readInt) . BS.words) <$> replicateM (n - 1) BS.getLine
   ts <- map (map (fst . fromJust . BS.readInt) . BS.words) <$> replicateM q BS.getLine
-  solve rs ts
+  solve n rs ts
 
-
--- | solve for ABC209-D 
--- >>> solve [[1, 2], [2, 3], [2, 4]] [[1, 2]]
+-- | solve for ABC209-D
+-- >>> solve 4 [[1, 2], [2, 3], [2, 4]] [[1, 2]]
 -- Road
 --
--- >>> solve [[1, 2], [2, 3], [3, 4], [4, 5]] [[1, 3], [1, 5]]
+-- >>> solve 5 [[1, 2], [2, 3], [3, 4], [4, 5]] [[1, 3], [1, 5]]
 -- Town
 -- Town
 --
--- >>> solve [[2, 3], [5, 6], [4, 8], [8, 9], [4, 5], [3, 4], [1, 9], [3, 7]] [[7, 9], [2, 5], [2, 6], [4, 6], [2, 4], [5, 8], [7, 8], [3, 6], [5, 6]]
+-- >>> solve 9 [[2, 3], [5, 6], [4, 8], [8, 9], [4, 5], [3, 4], [1, 9], [3, 7]] [[7, 9], [2, 5], [2, 6], [4, 6], [2, 4], [5, 8], [7, 8], [3, 6], [5, 6]]
 -- Town
 -- Road
 -- Town
@@ -33,44 +36,22 @@ main = do
 -- Road
 -- Road
 -- Road
--- 
-solve :: [[Int]] -> [[Int]] -> IO ()
-solve roads starts = do
-  let [townL, townR] = townGroup $ sol1 roads [] []
-  let c = chk townL starts
-  mapM_ (\[c', d'] -> if xor c' d' then putStrLn "Road" else putStrLn "Town") c
+--
+solve :: Int -> [[Int]] -> [[Int]] -> IO ()
+solve n roads starts = do
+  let lvl = T.levels $ head $ G.components (G.buildG (1, n) $ f roads)
+  let evenLvls = snd . foldl (\(l, x') x -> (xor l True, if l then IS.union x' x else x')) (True, IS.empty) . map IS.fromList $ lvl
+  mapM_ (\[c, d] -> putStrLn $ chk evenLvls c d) starts
   where
-    townGroup = map Set.fromList . foldl (\[ls, rs] [l, r] -> [l:ls, r:rs]) [[], []]
-    chk townL = map (\[c, d] -> [Set.member c townL, Set.member d townL])
+    chk l c d
+      | IS.member c l `xor` IS.member d l = "Road"
+      | otherwise = "Town"
 
-
--- | sol1
--- >>> sort $ sol1 [[1, 2], [2, 3], [2, 4]] [] []
--- [[1,2],[3,2],[4,2]]
---
--- >>> sort $ sol1 [[1, 2], [2, 3], [3, 4], [4, 5]] [] []
--- [[1,2],[3,2],[3,4],[5,4]]
---
--- >>> sort $ sol1 [[2, 3], [5, 6], [4, 8], [8, 9], [4, 5], [3, 4], [1, 9], [3, 7]] [] []
--- [[2,3],[4,3],[4,5],[4,8],[6,5],[7,3],[9,1],[9,8]]
-sol1 :: [[Int]] -> [[Int]] -> [[Int]] -> [[Int]]
-sol1 [] wk acc = wk ++ acc
-sol1 ([a, b]:rs) [] acc = (\(fixRoads, restRoads) -> sol1 restRoads fixRoads ([a, b]:acc)) $ sol2 a b rs 
-sol1 rs ([a, b]:xs) acc = (\(fixRoads, restRoads) -> sol1 restRoads (fixRoads ++ xs) ([a, b]:acc)) $ sol2 a b rs 
-sol1 _ _ _ = undefined
-
-
--- | sol2
--- >>> sol2 2 3 [[5, 6], [4, 8], [8, 9], [4, 5], [3, 4], [1, 9], [3, 7]]
--- ([[7,3],[4,3]],[[1,9],[4,5],[8,9],[4,8],[5,6]])
-sol2 :: Int -> Int -> [[Int]] -> ([[Int]], [[Int]])
-sol2 a b = foldl f ([], [])
-  where
-    f (fixRoads, restRoads) [a', b']
-      | a == a' || b == b' = ([a', b']:fixRoads, restRoads)
-      | a == b' || b == a' = ([b', a']:fixRoads, restRoads)
-      | otherwise = (fixRoads, [a', b']:restRoads)
-    f _ _ = undefined
+-- | helper func
+-- >>> f [[1, 2], [2, 3], [2, 4]]
+-- [(1,2),(2,3),(2,4)]
+f :: [[Int]] -> [(Int, Int)]
+f = map (\[a, b] -> (a, b))
 
 
 xor :: Bool -> Bool -> Bool
